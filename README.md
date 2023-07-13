@@ -33,6 +33,12 @@ n9:2, 12, N, None
 pycomm3_slc_cli> quit
 ```
 
+Read an array:
+```
+pycomm3_slc_cli 192.168.1.10 Read N9:0{5}
+n9:0, [1, 2, 3, 4, 5], N, None
+```
+
 ## The pycomm3 Project
 This application is a command line wrapper to ease the use of the many functions of the pycomm3 library.  The pyinstaller program is used to create an executable package on Windows that does not require the installation of Python.
 

@@ -35,12 +35,33 @@ n9:0, 21809, N, None
 
 import sys
 import datetime
+import time
 
 from pycomm3 import SLCDriver
+from pathlib import Path
 version = "0.1.0"
 comm = None
 output_format = "raw"
 output_formats = ["raw", "readable", "minimal"]
+show_timing = "off"
+
+#region HELPER FUNCTIONS
+def getTagValues(tags):
+    outData = []
+    for tag in tags:
+        if len(tag) > 0:
+            try:
+                result = comm.read(tag)
+            except Exception as error:
+                print("Error reading: " + tag + " - " + str(error))
+                tag_value = tag + "=!ERROR!"
+                outData += [tag + "=!ERROR!"]
+                continue
+            outData += [tag + "=" + str(result.value)]
+    return outData
+
+#endregion HELPER FUNCTIONS
+
 
 #region CONSOLE COMMAND DEFINITIONS
 def ipAddress(args):
@@ -92,19 +113,50 @@ def read(args):
     if (comm == None):
         print("ERROR - No IPAddress specified.  Use IPAddress command.")
         return
+    start_time = time.time()
     ret = comm.read(args)
+    exec_time = time.time() - start_time
     if (output_format == "raw"):
         print(ret)
     elif (output_format == "readable"):
-        print(ret[1])
+        print(ret.value)
+    if (show_timing):
+        print("Executed in {0:7.3f} seconds.".format(exec_time))
+    return
+
+def readTagFile(args):
+    if (comm == None):
+        print("ERROR - No IPAddress specified.  Use IPAddress command.")
+        return
+    words = args.split()
+    filename = words[0]
+    outFile = ""
+    if len(words) > 1:
+        outFile = words[1]
+    tags = Path(filename).read_text().split("\n")
+    start_time = time.time()
+    outData = getTagValues(tags)
+    exec_time = time.time() - start_time
+    if len(outFile) > 0:
+        Path(outFile).write_text("\n".join(outData))
+    else:
+        print("\n".join(outData))
+    if (show_timing):
+        print("Executed in {0:7.3f} seconds.".format(exec_time))
+    return
 
 def write(args):
     if (comm == None):
         print("ERROR - No IPAddress specified.  Use IPAddress command.")
         return
     words = args.split()
+    start_time = time.time()
     ret = comm.write((words[0], words[1]))
+    exec_time = time.time() - start_time
     print(ret)
+    if (show_timing):
+        print("Executed in {0:7.3f} seconds.".format(exec_time))
+    return
 
 def getHelp(args):
     print('''
@@ -117,7 +169,11 @@ def getHelp(args):
         Read <tag>                  - Returns the specified tag's value from the target PLC.
         Write <tag> <value>         - Sets the specified tag's value in the target PLC.
         Output (Raw | Readable)     - Sets the output format.  Raw is the default.
+        ShowTiming (On | Off)       - Turns on or off the time to execute feedback.
+        ReadTagFile <filename> [<outfile>]
+                                    - Returns the values of the tags from the file.
     ''')
+    return
 
 def output(args):
     global output_format
@@ -126,6 +182,16 @@ def output(args):
         print("Output format set to {}".format(args))
     else:
         print("Invalid output format")
+    return
+
+def showTiming(args):
+    global show_timing
+    if (args in ["on", "off"]):
+        show_timing = args == "on"
+        print("ShowTiming set to " + args + ".")
+    else:
+        print("Invalid ShowTiming argument.  Valid arguments are 'on' or 'off'.")
+    return
 
 #endregion CONSOLE COMMAND DEFINITIONS
 
@@ -143,18 +209,24 @@ def parseCommand(command):
             setPLCTime(getAdditionalArgs(command))
         elif (words[0] == "read"):
             read(getAdditionalArgs(command))
+        elif (words[0] == "readtagfile"):
+            readTagFile(getAdditionalArgs(command))
         elif (words[0] == "write"):
             write(getAdditionalArgs(command))
         elif (words[0] == "output"):
             output(getAdditionalArgs(command))
+        elif (words[0] == "showtiming"):
+            showTiming(getAdditionalArgs(command))
         else:
             print("ERROR - Unrecognized command.  Enter Help for a list of commands.")
+    return
 
 def commandLoop():
     command = input("pycomm3_slc_cli> ").casefold()
     while (command != "quit"):
         parseCommand(command)
         command = input("pycomm3_slc_cli> ").casefold()
+    return
 
 #endregion COMMAND LOOP
 
@@ -168,6 +240,7 @@ def getAdditionalArgs(command):
         return " ".join(words[1:])
     else:
         return ""
+
 #endregion HELPER FUNCTIONS
 
 #region MAIN
@@ -176,7 +249,7 @@ def main():
     arguments = sys.argv
     if (len(arguments) > 1):
         if (isIPAddress(arguments[1])):
-            comm.IPAddress = arguments[1]
+            ipAddress(arguments[1])
             if (len(arguments) > 2):
                 parseCommand(" ".join(arguments[2:]))
             else:
@@ -184,6 +257,7 @@ def main():
     else:
         commandLoop()
     comm.close()
+    return
 
 #endregion MAIN
 
