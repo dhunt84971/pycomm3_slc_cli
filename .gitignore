@@ -116,5 +116,6 @@ pylogix/testing/
 
 # Data Files
 *.csv
+*.CSV
 *.txt
 *.out

@@ -45,6 +45,9 @@ output_format = "raw"
 output_formats = ["raw", "readable", "minimal"]
 show_timing = False
 
+# CONSTANTS
+NOTFOUND = -1
+
 #region HELPER FUNCTIONS
 def getTagValues(tags):
     outData = []
@@ -70,6 +73,41 @@ def convertToWordBit(tag):
     else:
         converted_tag = tag
     return converted_tag
+
+def foundFile(file, files):
+    result = [i for i in range(len(files)) if files[i]["file"] == file]
+    if (len(result) > 0):
+        return result[0]
+    else:
+        return -1
+
+def getOptimizedTag(file, maxElements):
+    length = file["end_word"] - file["start_word"] + 1
+    outData = []
+    start_word = file["start_word"]
+    loop = length / maxElements
+    while loop > 1:
+        outData.append(file["file"] + ":" + str(start_word) \
+            + "{" + str(maxElements) + "}")
+        start_word += maxElements
+        loop -= 1
+    outData.append(file["file"] + ":" + str(start_word) \
+        + "{" + str(file["end_word"] - start_word + 1) + "}")
+    return outData
+
+def getTagValuesFromFile(filename):
+    tags = []
+    try:
+        tags = Path(filename).read_text().split("\n")
+    except Exception as error:
+        print("ERROR - Error opening the file {0}. {1}".format(filename, str(error)))
+        return []
+    outData = getTagValues(tags)
+    return outData
+
+def getTagValueFromData(tag, tagData):
+    tagValue = ""
+    return tagValue
 
 #endregion HELPER FUNCTIONS
 
@@ -141,24 +179,19 @@ def readTagFile(args):
         return
     words = args.split()
     filename = words[0]
-    outFile = ""
-    tags = []
-    if len(words) > 1:
-        outFile = words[1]
-    try:
-        tags = Path(filename).read_text().split("\n")
-    except Exception as error:
-        print("ERROR - Error opening the file {0}. {1}".format(filename, str(error)))
-        return
     start_time = time.time()
-    outData = getTagValues(tags)
-    exec_time = time.time() - start_time
-    if len(outFile) > 0:
-        Path(outFile).write_text("\n".join(outData))
-    else:
-        print("\n".join(outData))
-    if (show_timing):
-        print("Executed in {0:7.3f} seconds.".format(exec_time))
+    outData = getTagValuesFromFile(filename)
+    if len(outData) > 0:
+        outFile = ""
+        if len(words) > 1:
+            outFile = words[1]
+        exec_time = time.time() - start_time
+        if len(outFile) > 0:
+            Path(outFile).write_text("\n".join(outData))
+        else:
+            print("\n".join(outData))
+        if (show_timing):
+            print("Executed in {0:7.3f} seconds.".format(exec_time))
     return
 
 def optimizeTagFile(args):
@@ -184,15 +217,35 @@ def optimizeTagFile(args):
     # Group tags from like files.
     files = []
     for tag in outData:
-        file = tag.split(":")[0]
-        address = tag.split("/")[0]
-        word = int(address.split(":")[1])
-        if not file in files[file]:
-            files.append([file, word, word]]"file": file, "start_word": word, "end_word": word})
+        if len(tag) > 0:
+            file = tag.split(":")[0]
+            address = tag.split("/")[0]
+            field = address.split(":")[1]
+            if field.isnumeric():
+                word = int(field)
+                foundIndex = foundFile(file, files)
+                if foundIndex == NOTFOUND:
+                    files.append({"file": file, "start_word": word, "end_word": word})
+                else:
+                    if files[foundIndex]["start_word"] > word:
+                        files[foundIndex]["start_word"] = word
+                    if files[foundIndex]["end_word"] < word:
+                        files[foundIndex]["end_word"] = word
+            else:
+                files.append({"file": file, "address": field})
+    # Create new tag list from file grouped tags.
+    outData = []
+    for file in files:
+        if "start_word" in file.keys():
+            if file["file"].startswith("F"):
+                outData += getOptimizedTag(file, 60)     
+            elif file["file"].startswith("N") or file["file"].startswith("B"):
+                outData += getOptimizedTag(file, 120)     
+            else:
+                outData.append(file["file"] + ":" + str(file["start_word"]) \
+                    + "{" + str(file["end_word"] - file["start_word"] + 1) + "}")
         else:
-            index = 
-
-
+            outData.append(file["file"] + ":" + file["address"])
     exec_time = time.time() - start_time
     if len(outFile) > 0:
         Path(outFile).write_text("\n".join(outData))
@@ -200,7 +253,41 @@ def optimizeTagFile(args):
         print("\n".join(outData))
     if (show_timing):
         print("Executed in {0:7.3f} seconds.".format(exec_time))
+    return
 
+
+def readOptimizedTagFile(args):
+    if (comm == None):
+        print("ERROR - No IPAddress specified.  Use IPAddress command.")
+        return
+    words = args.split()
+    if len(words) < 2:
+        print("ERROR - Invalid number of arguments.  See help for more info.")
+        return
+    tagfilename = words[0]
+    opttagfilename = words[1]
+    outFile = ""
+    if len(words) > 2:
+        outFile = words[2]
+    start_time = time.time()
+    tagData = getTagValuesFromFile(opttagfilename)
+    if len(tagData) > 0:
+        # Open the tagfile, loop through the tags and find the value for each.
+        try:
+            tags = Path(tagfilename).read_text().split("\n")
+        except Exception as error:
+            print("ERROR - Error opening the file {0}. {1}".format(tagfilename, str(error)))
+            return
+        outData = []
+        for tag in tags:
+            outData.append(tag + "=" + getTagValueFromData(tag, tagData))
+        exec_time = time.time() - start_time
+        if len(outFile) > 0:
+            Path(outFile).write_text("\n".join(outData))
+        else:
+            print("\n".join(outData))
+        if (show_timing):
+            print("Executed in {0:7.3f} seconds.".format(exec_time))    
     return
 
 def write(args):
@@ -228,10 +315,14 @@ def getHelp(args):
         Write <tag> <value>         - Sets the specified tag's value in the target PLC.
         Output (Raw | Readable)     - Sets the output format.  Raw is the default.
         ShowTiming (On | Off)       - Turns on or off the time to execute feedback.
+          
+    Multi-Tag Commands: (Filenames are case sensitive.)
         ReadTagFile <filename> [<outfile>]
-                                    - Returns the values of the tags from the file.
+            - Returns the values of the tags from the file.
         OptimizeTagFile <filename> [<outfile>]
-                                    - Returns an optimized tag list from the source file.
+            - Returns an optimized tag list from the source file.
+        ReadOptimizedTagFile <tagfilename> <optimizedtagfilename> [<outfile>]
+            - Returns the values of the tags from the file using the optimized tag list.
     ''')
     return
 
@@ -273,6 +364,8 @@ def parseCommand(command):
             readTagFile(getAdditionalArgs(command))
         elif (words[0] == "optimizetagfile"):
             optimizeTagFile(getAdditionalArgs(command))
+        elif (words[0] == "readoptimizedtagfile"):
+            readOptimizedTagFile(getAdditionalArgs(command))
         elif (words[0] == "write"):
             write(getAdditionalArgs(command))
         elif (words[0] == "output"):
