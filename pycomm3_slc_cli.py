@@ -43,7 +43,7 @@ version = "0.1.0"
 comm = None
 output_format = "raw"
 output_formats = ["raw", "readable", "minimal"]
-show_timing = "off"
+show_timing = False
 
 #region HELPER FUNCTIONS
 def getTagValues(tags):
@@ -59,6 +59,17 @@ def getTagValues(tags):
                 continue
             outData += [tag + "=" + str(result.value)]
     return outData
+
+def convertToWordBit(tag):
+    if ((not ":" in tag) and ("/" in tag)):
+        file = tag.split("/")[0]
+        bitPos = int(tag.split("/")[1])
+        word = int(bitPos/16)
+        bit = bitPos % 16
+        converted_tag = file + ":" + str(word) + "/" + bit
+    else:
+        converted_tag = tag
+    return converted_tag
 
 #endregion HELPER FUNCTIONS
 
@@ -131,9 +142,14 @@ def readTagFile(args):
     words = args.split()
     filename = words[0]
     outFile = ""
+    tags = []
     if len(words) > 1:
         outFile = words[1]
-    tags = Path(filename).read_text().split("\n")
+    try:
+        tags = Path(filename).read_text().split("\n")
+    except Exception as error:
+        print("ERROR - Error opening the file {0}. {1}".format(filename, str(error)))
+        return
     start_time = time.time()
     outData = getTagValues(tags)
     exec_time = time.time() - start_time
@@ -143,6 +159,48 @@ def readTagFile(args):
         print("\n".join(outData))
     if (show_timing):
         print("Executed in {0:7.3f} seconds.".format(exec_time))
+    return
+
+def optimizeTagFile(args):
+    # This function returns or writes an optimized tag list based on the supplied tag list file.
+    words = args.split()
+    filename = words[0]
+    outFile = ""
+    tags = []
+    if len(words) > 1:
+        outFile = words[1]
+    try:
+        tags = Path(filename).read_text().split("\n")
+    except Exception as error:
+        print("ERROR - Error opening the file {0}. {1}".format(filename, str(error)))
+        return
+    start_time = time.time()
+    # Sort the file alphabetically.
+    tags.sort()
+    outData = []
+    # Convert all bit tag formats to word/bit format.
+    for tag in tags:
+        outData.append(convertToWordBit(tag))
+    # Group tags from like files.
+    files = []
+    for tag in outData:
+        file = tag.split(":")[0]
+        address = tag.split("/")[0]
+        word = int(address.split(":")[1])
+        if not file in files[file]:
+            files.append([file, word, word]]"file": file, "start_word": word, "end_word": word})
+        else:
+            index = 
+
+
+    exec_time = time.time() - start_time
+    if len(outFile) > 0:
+        Path(outFile).write_text("\n".join(outData))
+    else:
+        print("\n".join(outData))
+    if (show_timing):
+        print("Executed in {0:7.3f} seconds.".format(exec_time))
+
     return
 
 def write(args):
@@ -172,6 +230,8 @@ def getHelp(args):
         ShowTiming (On | Off)       - Turns on or off the time to execute feedback.
         ReadTagFile <filename> [<outfile>]
                                     - Returns the values of the tags from the file.
+        OptimizeTagFile <filename> [<outfile>]
+                                    - Returns an optimized tag list from the source file.
     ''')
     return
 
@@ -211,6 +271,8 @@ def parseCommand(command):
             read(getAdditionalArgs(command))
         elif (words[0] == "readtagfile"):
             readTagFile(getAdditionalArgs(command))
+        elif (words[0] == "optimizetagfile"):
+            optimizeTagFile(getAdditionalArgs(command))
         elif (words[0] == "write"):
             write(getAdditionalArgs(command))
         elif (words[0] == "output"):
@@ -222,10 +284,10 @@ def parseCommand(command):
     return
 
 def commandLoop():
-    command = input("pycomm3_slc_cli> ").casefold()
-    while (command != "quit"):
+    command = input("pycomm3_slc_cli> ")
+    while (command.casefold() != "quit"):
         parseCommand(command)
-        command = input("pycomm3_slc_cli> ").casefold()
+        command = input("pycomm3_slc_cli> ")
     return
 
 #endregion COMMAND LOOP
@@ -235,7 +297,7 @@ def isIPAddress(value):
     return len(value.split(".")) == 4
 
 def getAdditionalArgs(command):
-    words = command.casefold().split()
+    words = command.split()
     if (len(words) > 1):
         return " ".join(words[1:])
     else:
