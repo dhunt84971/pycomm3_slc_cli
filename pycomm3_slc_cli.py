@@ -48,7 +48,25 @@ show_timing = False
 # CONSTANTS
 NOTFOUND = -1
 
+
 #region HELPER FUNCTIONS
+def isNumber(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+def getNumber(s):
+    assert not isNumber(s), "Expected a number, got {s}".format(s)
+    if s.isnumeric():
+        return int(s)
+    else: 
+        return float(s)
+    
+#endregion HELPER FUNCTIONS
+
+#region DATA HELPER FUNCTIONS
 def getTagValues(tags):
     outData = []
     for tag in tags:
@@ -105,11 +123,51 @@ def getTagValuesFromFile(filename):
     outData = getTagValues(tags)
     return outData
 
+def getTagParts(tag):
+    file = tag.split(":")[0]
+    word = int(tag.split(":")[1].split("/")[0])
+    bit = NOTFOUND
+    if tag.contains("/"):
+        bit = int(tag.split("/")[1])
+    return {"file": file, "word": word, "bit": bit, "data": ""}
+
+def getDataParts(data):
+    file = data.split(":")[0]
+    wordString = data.split(":")[1].split("{")[0]
+    word = NOTFOUND
+    if wordString.isnumeric():
+        word = int(wordString)
+    dataString = data.split("=")[1]
+    dataArray = []
+    if dataString.contains("["):
+        dataStringArray = dataString.splt("[")[1].split("]")[0].split(",")
+        if file.startswith("F"):
+            dataArray = [float(i) for i in dataStringArray.split(",")]
+        else:
+            dataArray = [int(i) for i in dataStringArray.split(",")]
+    elif not isNumber(dataString):
+        dataArray = [dataString]
+    else:
+        dataArray = [int(dataString)]
+    length = len(dataArray)
+    end_word = word + length - 1
+    return {"file": file, "start_word": word, "length": length, 
+            "end_word": end_word ,"data": dataArray}
+
 def getTagValueFromData(tag, tagData):
     tagValue = ""
-    return tagValue
+    tagParts = getTagParts(tag)
+    for data in tagData:
+        dataParts = getDataParts(data)
+        if tagParts["file"] == dataParts["file"]:
+            if tagParts["word"] >= dataParts["start_word"] and tagParts["word"] <= dataParts["end_word"]:
+                wordPos = tagParts["word"] - dataParts["start_word"]
+                wordData = getNumber(dataParts[wordPos])
+                if tag.contains("/"):
+                    
+    return "NONE"
 
-#endregion HELPER FUNCTIONS
+#endregion DATA HELPER FUNCTIONS
 
 
 #region CONSOLE COMMAND DEFINITIONS
@@ -272,7 +330,7 @@ def readOptimizedTagFile(args):
     start_time = time.time()
     tagData = getTagValuesFromFile(opttagfilename)
     if len(tagData) > 0:
-        # Open the tagfile, loop through the tags and find the value for each.
+        # Open the tagfile, loop through the tags and find the value for each in the tagData.
         try:
             tags = Path(tagfilename).read_text().split("\n")
         except Exception as error:
