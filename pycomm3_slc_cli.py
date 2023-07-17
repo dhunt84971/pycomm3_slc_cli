@@ -58,12 +58,15 @@ def isNumber(s):
         return False
 
 def getNumber(s):
-    assert not isNumber(s), "Expected a number, got {s}".format(s)
-    if s.isnumeric():
-        return int(s)
-    else: 
-        return float(s)
-    
+    assert isNumber(s), "Expected a number, got {0}".format(s)
+    if isinstance(s, str):
+        if s.isnumeric():
+            return int(s)
+        else: 
+            return float(s)
+    else:
+        return s
+        
 #endregion HELPER FUNCTIONS
 
 #region DATA HELPER FUNCTIONS
@@ -87,7 +90,7 @@ def convertToWordBit(tag):
         bitPos = int(tag.split("/")[1])
         word = int(bitPos/16)
         bit = bitPos % 16
-        converted_tag = file + ":" + str(word) + "/" + bit
+        converted_tag = file + ":" + str(word) + "/" + str(bit)
     else:
         converted_tag = tag
     return converted_tag
@@ -124,12 +127,16 @@ def getTagValuesFromFile(filename):
     return outData
 
 def getTagParts(tag):
+    tag = convertToWordBit(tag)
     file = tag.split(":")[0]
-    word = int(tag.split(":")[1].split("/")[0])
+    word = NOTFOUND
     bit = NOTFOUND
-    if tag.contains("/"):
+    if "/" in tag:
+        word = int(tag.split(":")[1].split("/")[0])
         bit = int(tag.split("/")[1])
-    return {"file": file, "word": word, "bit": bit, "data": ""}
+    elif tag.split(":")[1].isnumeric():
+        word = int(tag.split(":")[1])
+    return {"file": file, "word": word, "bit": bit}
 
 def getDataParts(data):
     file = data.split(":")[0]
@@ -139,12 +146,12 @@ def getDataParts(data):
         word = int(wordString)
     dataString = data.split("=")[1]
     dataArray = []
-    if dataString.contains("["):
-        dataStringArray = dataString.splt("[")[1].split("]")[0].split(",")
+    if "[" in dataString:
+        dataStringArray = dataString.split("[")[1].split("]")[0].split(",")
         if file.startswith("F"):
-            dataArray = [float(i) for i in dataStringArray.split(",")]
+            dataArray = [float(i) for i in dataStringArray]
         else:
-            dataArray = [int(i) for i in dataStringArray.split(",")]
+            dataArray = [int(i) for i in dataStringArray]
     elif not isNumber(dataString):
         dataArray = [dataString]
     else:
@@ -162,9 +169,11 @@ def getTagValueFromData(tag, tagData):
         if tagParts["file"] == dataParts["file"]:
             if tagParts["word"] >= dataParts["start_word"] and tagParts["word"] <= dataParts["end_word"]:
                 wordPos = tagParts["word"] - dataParts["start_word"]
-                wordData = getNumber(dataParts[wordPos])
-                if tag.contains("/"):
-                    
+                wordData = getNumber(dataParts["data"][wordPos])
+                if "/" in tag and tagParts["bit"] != NOTFOUND:
+                    return wordData & (tagParts["bit"]**2) == tagParts["bit"]**2
+                else:
+                    return wordData                    
     return "NONE"
 
 #endregion DATA HELPER FUNCTIONS
@@ -338,7 +347,8 @@ def readOptimizedTagFile(args):
             return
         outData = []
         for tag in tags:
-            outData.append(tag + "=" + getTagValueFromData(tag, tagData))
+            if len(tag) > 0:
+                outData.append(tag + "=" + str(getTagValueFromData(tag, tagData)))
         exec_time = time.time() - start_time
         if len(outFile) > 0:
             Path(outFile).write_text("\n".join(outData))
