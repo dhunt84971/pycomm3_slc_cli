@@ -39,6 +39,16 @@ pycomm3_slc_cli 192.168.1.10 Read N9:0{5}
 n9:0, [1, 2, 3, 4, 5], N, None
 ```
 
+Get the current and last fault code:
+```
+pycomm3_slc_cli 100.100.100.50 Read S:6
+s:6, 0, S, None
+pycomm3_slc_cli 100.100.100.50 Read S:54
+s:54, 2140, S, None
+```
+
+
+
 ## Commands
 The following commands are not case-sensitive.
 + ```Help```                        - Displays this list of commands.
