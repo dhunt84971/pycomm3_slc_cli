@@ -475,11 +475,15 @@ def main():
             ipAddress(arguments[1])
             if (len(arguments) > 2):
                 parseCommand(" ".join(arguments[2:]))
+                comm.close()
             else:
                 commandLoop()
+                comm.close()
+        else:
+            parseCommand(" ".join(arguments[1:]))
     else:
         commandLoop()
-    comm.close()
+        comm.close()
     return
 
 #endregion MAIN
