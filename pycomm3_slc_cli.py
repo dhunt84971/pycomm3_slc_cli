@@ -171,7 +171,7 @@ def getTagValueFromData(tag, tagData):
                 wordPos = tagParts["word"] - dataParts["start_word"]
                 wordData = getNumber(dataParts["data"][wordPos])
                 if "/" in tag and tagParts["bit"] != NOTFOUND:
-                    return wordData & (tagParts["bit"]**2) == tagParts["bit"]**2
+                    return (wordData & 2**tagParts["bit"]) == 2**tagParts["bit"]
                 else:
                     return wordData                    
     return "NONE"
