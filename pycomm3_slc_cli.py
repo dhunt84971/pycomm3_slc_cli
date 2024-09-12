@@ -77,8 +77,7 @@ def getTagValues(tags):
             try:
                 result = comm.read(tag)
             except Exception as error:
-                print("Error reading: " + tag + " - " + str(error))
-                tag_value = tag + "=!ERROR!"
+                #print("Error reading: " + tag + " - " + str(error))
                 outData += [tag + "=!ERROR!"]
                 continue
             outData += [tag + "=" + str(result.value)]
@@ -162,13 +161,14 @@ def getDataParts(data):
             "end_word": end_word ,"data": dataArray}
 
 def getTagValueFromData(tag, tagData):
-    tagValue = ""
     tagParts = getTagParts(tag)
     for data in tagData:
         dataParts = getDataParts(data)
         if tagParts["file"] == dataParts["file"]:
             if tagParts["word"] >= dataParts["start_word"] and tagParts["word"] <= dataParts["end_word"]:
                 wordPos = tagParts["word"] - dataParts["start_word"]
+                if dataParts["data"][0] == "!ERROR!":
+                    return "!ERROR!"
                 wordData = getNumber(dataParts["data"][wordPos])
                 if "/" in tag and tagParts["bit"] != NOTFOUND:
                     return (wordData & 2**tagParts["bit"]) == 2**tagParts["bit"]
@@ -348,7 +348,8 @@ def readOptimizedTagFile(args):
         outData = []
         for tag in tags:
             if len(tag) > 0:
-                outData.append(tag + "=" + str(getTagValueFromData(tag, tagData)))
+                tagValue = str(getTagValueFromData(tag, tagData))
+                outData.append(tag + "=" + tagValue)
         exec_time = time.time() - start_time
         if len(outFile) > 0:
             Path(outFile).write_text("\n".join(outData))
