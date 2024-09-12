@@ -39,7 +39,7 @@ import time
 
 from pycomm3 import SLCDriver
 from pathlib import Path
-version = "0.2.0"
+version = "0.2.1"
 comm = None
 output_format = "raw"
 output_formats = ["raw", "readable", "minimal"]
